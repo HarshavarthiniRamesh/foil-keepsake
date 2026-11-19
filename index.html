@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Foil Keepsake</title>
+  <meta name="description" content="Press a little message into a chocolate wrapper, and send it to someone special.">
+  <meta name="theme-color" content="#f6f6f4">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Ibarra+Real+Nova:wght@400&family=Schibsted+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body data-mode="edit">
+  <main class="desk">
+    <header class="intro">
+      <h1>Foil Keepsake</h1>
+      <p class="lede edit-only">Emboss a note for someone special.</p>
+      <p class="lede view-only">Someone kept this one for you.</p>
+    </header>
+
+    <div class="sheet">
+      <canvas id="foil" aria-label="Chocolate wrapper foil. Press and drag to press lines into it."></canvas>
+      <button id="lamp" class="lamp" aria-label="Light. Drag, or use the arrow keys, to move it.">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.6"/><path d="M12 3v1.8M12 19.2V21M3 12h1.8M19.2 12H21M5.6 5.6l1.3 1.3M17.1 17.1l1.3 1.3M5.6 18.4l1.3-1.3M17.1 6.9l1.3-1.3"/></svg>
+      </button>
+      <button id="reveal" class="reveal" hidden>
+        <span class="reveal-card">
+          <span class="reveal-title">Something's been pressed into this wrapper</span>
+          <span class="reveal-sub">Tap to reveal (sound on)</span>
+        </span>
+      </button>
+    </div>
+
+    <nav class="dock edit-only" aria-label="Foil tools">
+      <button class="swatch gold" data-foil="gold" aria-label="Gold foil" title="Gold foil"></button>
+      <button class="swatch silver" data-foil="silver" aria-label="Silver foil" title="Silver foil"></button>
+      <span class="sep" aria-hidden="true"></span>
+      <button class="dbtn tip" data-tool="fine" aria-label="Fine tip" title="Fine tip"><i style="--d:4px"></i></button>
+      <button class="dbtn tip" data-tool="medium" aria-label="Medium tip" title="Medium tip"><i style="--d:7px"></i></button>
+      <button class="dbtn tip" data-tool="bold" aria-label="Bold tip" title="Bold tip"><i style="--d:11px"></i></button>
+      <span class="sep" aria-hidden="true"></span>
+      <button class="dbtn" id="undo" aria-label="Undo" title="Undo">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+      <button class="dbtn" id="clear" aria-label="Smooth it out (clear)" title="Smooth it out">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12.5a1.5 1.5 0 0 0 1.5 1.5h8a1.5 1.5 0 0 0 1.5-1.5l1-12.5M9 7V4.5A1 1 0 0 1 10 3.5h4a1 1 0 0 1 1 1V7"/></svg>
+      </button>
+      <button class="dbtn" id="sound" aria-pressed="true" aria-label="Mute sound" title="Sound">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9h4l5-4v14l-5-4H4z"/><path class="wave" d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/><path class="mute" d="m16 9 6 6m0-6-6 6"/></svg>
+      </button>
+      <button class="dbtn" id="save" aria-label="Save image" title="Save image">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></svg>
+      </button>
+      <span class="sep" aria-hidden="true"></span>
+      <button class="pill" id="share">Share</button>
+    </nav>
+
+    <nav class="dock view-only" aria-label="Keepsake actions">
+      <button class="dbtn" id="replay" aria-label="Replay" title="Replay">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.34-5.66M4 4v5h5"/></svg>
+      </button>
+      <button class="dbtn" id="save-view" aria-label="Save image" title="Save image">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></svg>
+      </button>
+      <span class="sep" aria-hidden="true"></span>
+      <button class="pill" id="own">Make your own</button>
+    </nav>
+
+    <p class="hint edit-only">Drag the light around to see your pressing catch it.</p>
+    <p class="credit">By <a href="https://x.com/harshajayram" target="_blank" rel="noopener">Harsha</a></p>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="unsupported" class="unsupported" hidden>
+    <p>This browser can't render the foil (it needs WebGL2). Try a recent Chrome, Safari or Firefox.</p>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
