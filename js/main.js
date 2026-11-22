@@ -463,10 +463,33 @@ for (const id of ['#save', '#save-view']) {
   });
 }
 
+// Shared links are kept short: the packed note is saved under a short id
+// (api/notes.js) and the link carries just that. If saving isn't possible
+// (no server, offline), the whole note goes in the link as before.
+const shortLinks = new Map(); // packed note -> link, so a second tap is instant
+async function linkFor(data) {
+  if (shortLinks.has(data)) return shortLinks.get(data);
+  let url = `${location.origin}${location.pathname}#k=${data}`;
+  try {
+    const r = await fetch('api/notes', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ k: data }),
+    });
+    if (r.ok) {
+      const { id } = await r.json();
+      if (id) url = `${location.origin}${location.pathname}#n=${id}`;
+    }
+  } catch {}
+  shortLinks.set(data, url);
+  return url;
+}
+
 $('#share').addEventListener('click', async () => {
   if (!state.strokes.length) return;
   const data = await encodeKeepsake(state);
-  const url = `${location.origin}${location.pathname}#k=${data}`;
+  const fresh = !shortLinks.has(data);
+  const url = await linkFor(data);
   const text = 'I pressed something into a chocolate wrapper for you.';
   if (navigator.share && matchMedia('(pointer: coarse)').matches) {
     try {
@@ -474,6 +497,12 @@ $('#share').addEventListener('click', async () => {
       return;
     } catch (err) {
       if (err.name === 'AbortError') return;
+      // some phones only open the share sheet straight from the tap; the
+      // link's ready now, so the next tap opens it at once
+      if (err.name === 'NotAllowedError' && fresh) {
+        toast('Your link is ready. Tap Share again to send it.');
+        return;
+      }
     }
   }
   try {
@@ -619,11 +648,35 @@ $('#open-note').addEventListener('click', openNote);
 fold.addEventListener('click', openNote);
 
 // ------------------------------------------------------------------ boot ---
+// the packed note from the link: in it directly (#k=), or saved under a
+// short id (#n=)
+async function packedFromLink() {
+  const k = location.hash.match(/[#&]k=([\w-]+)/);
+  if (k) return k[1];
+  const n = location.hash.match(/[#&]n=([A-Za-z0-9]+)/);
+  if (!n) return null;
+  const r = await fetch(`api/notes?id=${n[1]}`);
+  if (!r.ok) throw new Error(`note ${r.status}`);
+  return (await r.json()).k;
+}
+
 async function boot() {
-  const match = location.hash.match(/[#&]k=([\w-]+)/);
-  if (match) {
+  // a shared one: show the receiving view (and no bare foil) while it loads
+  const shared = /[#&][kn]=/.test(location.hash);
+  if (shared) {
+    document.body.dataset.mode = 'view';
+    canvas.classList.add('hidden-sheet');
+  }
+  let packed = null;
+  try {
+    packed = await packedFromLink();
+  } catch (err) {
+    console.warn('Could not fetch keepsake:', err);
+    toast('That link looks crumpled beyond repair. Here is a fresh wrapper.');
+  }
+  if (packed) {
     try {
-      const k = await decodeKeepsake(match[1], { w: TEX_W * 2, h: TEX_H * 2 });
+      const k = await decodeKeepsake(packed, { w: TEX_W * 2, h: TEX_H * 2 });
       Object.assign(state, k, { mode: 'view' });
       showFolded();
     } catch (err) {
@@ -631,6 +684,7 @@ async function boot() {
       toast('That link looks crumpled beyond repair. Here is a fresh wrapper.');
     }
   }
+  if (state.mode !== 'view') canvas.classList.remove('hidden-sheet');
   renderer.bake(state.seed, { letterFold: state.mode === 'view' });
   syncUI();
   requestAnimationFrame(frame);
