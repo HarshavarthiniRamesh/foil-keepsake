@@ -1,175 +1,173 @@
-// Preset stamps, after Mexican tin (hojalata) and foil repoussé: flowing
-// C-scrolls and spirals, tapered leaves with veins, pointed petals, rows of
-// beads and doubled outlines. Lines are kept fine so the shapes read as
-// crafted rather than cartoon. Each is drawn in a 100×100 box. Parts:
+// Preset stamps, in the style of folk tin and foil embossing: a bold outline,
+// a second contour just inside it, and small lines and dots for detail. Each
+// is drawn in a 100×100 box. Parts:
 //   { d }                  a pressed line (SVG path data)
-//   { d, scale, o }        the same path shrunk toward o (default the centre)
+//   { d, scale }           the same path shrunk toward the centre (inner contour)
 //   { dots: d, n, scale }  n small dots spaced evenly along a path
 //   { dot: [x, y] }        a single dot
 // 'w' picks the groove width: 'o' outline, 'd' detail.
 
 const C = 50;
-const f = (n) => n.toFixed(1);
 
-function line(points) {
-  return 'M' + points.map(([x, y]) => `${f(x)} ${f(y)}`).join('L');
+function poly(points) {
+  return 'M' + points.map(([x, y]) => `${x.toFixed(1)} ${y.toFixed(1)}`).join('L') + 'Z';
+}
+
+function starPoints(n, R, r, rot = -Math.PI / 2) {
+  const pts = [];
+  for (let i = 0; i < n * 2; i++) {
+    const a = rot + (i * Math.PI) / n;
+    const k = i % 2 ? r : R;
+    pts.push([C + Math.cos(a) * k, C + Math.sin(a) * k]);
+  }
+  return pts;
 }
 
 function circle(cx, cy, r) {
   return `M${cx - r} ${cy}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0Z`;
 }
 
-// a curl: starts at angle a0 (radians, screen coords) at radius R from
-// (cx, cy) and winds `turns` times inward to radius r; dir 1 or -1
-function spiral(cx, cy, R, r, a0, turns, dir = 1) {
-  const n = Math.ceil(turns * 40), pts = [];
-  for (let i = 0; i <= n; i++) {
-    const t = i / n, a = a0 + dir * t * turns * Math.PI * 2;
-    const k = R * Math.pow(r / R, t);
-    pts.push([cx + Math.cos(a) * k, cy + Math.sin(a) * k]);
-  }
-  return line(pts);
-}
+const HEART = 'M50 86C24 68 8 52 10 33C12 17 30 11 42 20C46 23 48 26 50 30C52 26 54 23 58 20C70 11 88 17 90 33C92 52 76 68 50 86Z';
 
-// a frame from (bx,by) toward (tx,ty): P(t, k) is t along, k across (in w)
-function frame(bx, by, tx, ty, w) {
-  const ux = tx - bx, uy = ty - by, L = Math.hypot(ux, uy);
-  const vx = -uy / L, vy = ux / L;
-  return (t, k) => `${f(bx + ux * t + vx * k * w)} ${f(by + uy * t + vy * k * w)}`;
-}
+const STAR5 = poly(starPoints(5, 46, 20));
 
-// a tapered almond leaf with a midrib and, optionally, veins angled to the tip
-function leaf(bx, by, tx, ty, w, veins = 0) {
-  const P = frame(bx, by, tx, ty, w);
-  const parts = [
-    { d: `M${P(0, 0)}C${P(0.25, 1.3)} ${P(0.7, 0.9)} ${P(1, 0)}C${P(0.7, -0.9)} ${P(0.25, -1.3)} ${P(0, 0)}Z`, w: 'o' },
-    { d: `M${P(0.06, 0)}L${P(0.84, 0)}`, w: 'd' },
-  ];
-  for (let i = 0; i < veins; i++) {
-    const t = 0.22 + (i * 0.5) / Math.max(veins - 1, 1);
-    for (const sg of [1, -1]) parts.push({ d: `M${P(t, 0)}L${P(t + 0.14, sg * 0.62)}`, w: 'd' });
+function snowflake() {
+  const parts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3 - Math.PI / 2;
+    const ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+    const P = (t, s) => `${(C + ux * t + vx * s).toFixed(1)} ${(C + uy * t + vy * s).toFixed(1)}`;
+    parts.push({ d: `M${P(10, 0)}L${P(44, 0)}`, w: 'o' });
+    parts.push({ d: `M${P(22, -9)}L${P(28, 0)}L${P(22, 9)}`, w: 'd' });
+    parts.push({ d: `M${P(32, -8)}L${P(37, 0)}L${P(32, 8)}`, w: 'd' });
+    parts.push({ dot: [C + ux * 47, C + uy * 47] });
   }
+  const hex = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3 - Math.PI / 2 + Math.PI / 6;
+    hex.push([C + Math.cos(a) * 11, C + Math.sin(a) * 11]);
+  }
+  parts.push({ d: poly(hex), w: 'o' });
+  parts.push({ dot: [C, C] });
   return parts;
 }
 
-// a pointed petal around the centre, from radius r0 to r1 at angle a
-function petal(a, r0, r1, w) {
-  const ux = Math.cos(a), uy = Math.sin(a);
-  return frame(C + ux * r0, C + uy * r0, C + ux * r1, C + uy * r1, w);
-}
+const TREE = 'M50 8L66 34L60 34L74 56L66 56L82 80L18 80L34 56L26 56L40 34L34 34Z';
 
-const HEART = 'M50 92C27 76 13 62 15 45C17 31 32 26 42 34C46 37 48 40 50 43C52 40 54 37 58 34C68 26 83 31 85 45C87 62 73 76 50 92Z';
-const HEART_O = [50, 58];
-
-function sun() {
-  const parts = [
-    { d: circle(C, C, 14), w: 'o' },
-    { dots: circle(C, C, 9), n: 10 },
-    { dot: [C, C] },
-  ];
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4 - Math.PI / 2;
-    const P = petal(a, 19, 44, 1);
-    // a flame-like wavy ray, then a short straight one with a bead
-    parts.push({ d: `M${P(0, 0)}C${P(0.35, 5)} ${P(0.6, -5)} ${P(1, 0)}`, w: 'o' });
-    const Q = petal(a + Math.PI / 8, 19, 31, 1);
-    parts.push({ d: `M${Q(0, 0)}L${Q(1, 0)}`, w: 'd' });
-    parts.push({ dot: [C + Math.cos(a + Math.PI / 8) * 36, C + Math.sin(a + Math.PI / 8) * 36] });
-  }
-  return parts;
-}
-
-function scroll() {
-  // two C-scrolls curling out of a stem, a leaf rising between them
-  return [
-    { d: 'M50 80L50 62', w: 'o' },
-    { d: spiral(31, 44, 25, 3, Math.PI * 0.26, 1.25, 1), w: 'o' },
-    { d: spiral(69, 44, 25, 3, Math.PI * 0.74, 1.25, -1), w: 'o' },
-    ...leaf(50, 56, 50, 8, 9, 0),
-    { dot: [31, 44] }, { dot: [69, 44] },
-    { dot: [50, 88] },
-  ];
-}
-
-function tulip() {
-  return [
-    { d: 'M30 34C28 54 38 66 50 66C62 66 72 54 70 34C64 40 60 44 58 46C56 38 53 30 50 24C47 30 44 38 42 46C40 44 36 40 30 34Z', w: 'o' },
-    { d: 'M42 46C43 56 46 61 50 64C54 61 57 56 58 46', w: 'd' },
-    { d: 'M50 66C50 76 47 86 50 96', w: 'o' },
-    ...leaf(49, 90, 24, 64, 7, 0),
-    ...leaf(50, 84, 76, 62, 7, 0),
-  ];
-}
-
-function rosette() {
-  const parts = [{ d: circle(C, C, 10), w: 'o' }, { dots: circle(C, C, 5), n: 6 }];
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4 - Math.PI / 2;
-    const P = petal(a, 13, 43, 9);
-    parts.push({ d: `M${P(0, 0)}C${P(0.2, 1.2)} ${P(0.7, 0.9)} ${P(1, 0)}C${P(0.7, -0.9)} ${P(0.2, -1.2)} ${P(0, 0)}Z`, w: 'o' });
-    parts.push({ d: `M${P(0.2, 0)}L${P(0.68, 0)}`, w: 'd' });
-    const b = a + Math.PI / 8;
-    parts.push({ dot: [C + Math.cos(b) * 38, C + Math.sin(b) * 38] });
-  }
-  return parts;
-}
-
-function vine() {
-  // an S-curve with a curl at each end and leaves along it
-  return [
-    { d: 'M24 78C38 80 44 62 50 50C56 38 62 20 76 22', w: 'o' },
-    { d: spiral(18, 70, 9.5, 2, Math.PI * 0.35, 1.1, 1), w: 'o' },
-    { d: spiral(82, 30, 9.5, 2, Math.PI * 1.35, 1.1, 1), w: 'o' },
-    ...leaf(40, 70, 58, 86, 6, 0),
-    ...leaf(46, 58, 26, 46, 6, 0),
-    ...leaf(54, 42, 74, 54, 6, 0),
-    ...leaf(60, 30, 42, 14, 6, 0),
-  ];
-}
+const BELL = 'M50 14C38 14 31 23 30 36C29 50 26 62 16 72L84 72C74 62 71 50 70 36C69 23 62 14 50 14Z';
 
 const MOON = 'M62 10C40 12 24 30 24 52C24 74 42 90 64 90C72 90 80 87 86 82C82 83 78 84 74 84C52 84 36 68 36 47C36 31 46 17 62 10Z';
 
-// a slim four-pointed sparkle
-function sparkle(cx, cy, R) {
-  const r = R * 0.22, pts = [];
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4 - Math.PI / 2, k = i % 2 ? r : R;
-    pts.push([cx + Math.cos(a) * k, cy + Math.sin(a) * k]);
+function flower() {
+  const parts = [];
+  for (let i = 0; i < 6; i++) {
+    const a = (i * Math.PI) / 3 - Math.PI / 2;
+    const ux = Math.cos(a), uy = Math.sin(a), vx = -uy, vy = ux;
+    const P = (t, s) => `${(C + ux * t + vx * s).toFixed(1)} ${(C + uy * t + vy * s).toFixed(1)}`;
+    parts.push({ d: `M${P(12, 0)}C${P(20, -16)} ${P(40, -14)} ${P(45, 0)}C${P(40, 14)} ${P(20, 16)} ${P(12, 0)}Z`, w: 'o' });
+    parts.push({ d: `M${P(17, 0)}L${P(37, 0)}`, w: 'd' });
   }
-  return line(pts) + 'Z';
+  parts.push({ d: circle(C, C, 9), w: 'o' });
+  parts.push({ dots: circle(C, C, 4.5), n: 5 });
+  return parts;
 }
 
-// The order matters: shared links store a stamp by its place in this list.
+// a holly leaf from (bx,by) to (tx,ty): spiky points with scooped edges between
+function hollyLeaf(bx, by, tx, ty, w) {
+  const ux = tx - bx, uy = ty - by, L = Math.hypot(ux, uy);
+  const vx = -uy / L, vy = ux / L;
+  const P = (t, k) => `${(bx + ux * t + vx * k * w).toFixed(1)} ${(by + uy * t + vy * k * w).toFixed(1)}`;
+  const side = (sgn) => {
+    const spikes = [[0.22, 0.8], [0.48, 1], [0.74, 0.8]];
+    let d = '';
+    let prev = 0;
+    for (const [t, k] of spikes) {
+      d += `Q${P((prev + t) / 2, sgn * k * 0.45)} ${P(t, sgn * k)}`;
+      prev = t;
+    }
+    return d + `Q${P((prev + 1) / 2, sgn * 0.35)} ${P(1, 0)}`;
+  };
+  // up one side to the tip, back down the other
+  const back = (() => {
+    const spikes = [[0.74, 0.8], [0.48, 1], [0.22, 0.8]];
+    let d = '';
+    let prev = 1;
+    for (const [t, k] of spikes) {
+      d += `Q${P((prev + t) / 2, -k * 0.45)} ${P(t, -k)}`;
+      prev = t;
+    }
+    return d + `Q${P(prev / 2, -0.35)} ${P(0, 0)}`;
+  })();
+  return { outline: `M${P(0, 0)}` + side(1) + back + 'Z', vein: `M${P(0.04, 0)}L${P(0.92, 0)}` };
+}
+const HOLLY_L = hollyLeaf(48, 56, 12, 26, 13);
+const HOLLY_R = hollyLeaf(52, 56, 88, 26, 13);
+
 export const STAMPS = {
   heart: {
     name: 'Heart',
     parts: [
       { d: HEART, w: 'o' },
-      { d: HEART, scale: 0.8, o: HEART_O, w: 'd' },
-      { dots: HEART, scale: 0.9, o: HEART_O, n: 26 },
-      // a flame of three tongues rising from the cleft
-      { d: 'M43 37C38 31 40 25 42 18C44 24 46 27 47.5 25C47 18 48 13 50 6C52 13 53 18 52.5 25C54 27 56 24 58 18C60 25 62 31 57 37', w: 'o' },
-      // a sprig inside: two leaves from the point
-      ...leaf(50, 74, 37, 50, 6.5, 0),
-      ...leaf(50, 74, 63, 50, 6.5, 0),
-      { dot: [50, 56] },
+      { d: HEART, scale: 0.78, w: 'd' },
+      { dots: HEART, scale: 0.89, n: 26 },
+      { d: 'M50 44C46 40 40 42 41 48C42 53 46 56 50 60C54 56 58 53 59 48C60 42 54 40 50 44Z', w: 'd' },
     ],
   },
-  sun: { name: 'Sun', parts: sun() },
-  scroll: { name: 'Scroll', parts: scroll() },
-  leaf: { name: 'Leaf', parts: [...leaf(26, 86, 78, 12, 15, 4), { d: spiral(20, 86, 6, 1.5, 0, 0.9, 1), w: 'd' }] },
-  tulip: { name: 'Tulip', parts: tulip() },
+  star: {
+    name: 'Star',
+    parts: [
+      { d: STAR5, w: 'o' },
+      { d: STAR5, scale: 0.7, w: 'd' },
+      ...starPoints(5, 46, 20).filter((_, i) => i % 2 === 0).map(([x, y]) => ({
+        d: `M${C} ${C}L${(C + (x - C) * 0.55).toFixed(1)} ${(C + (y - C) * 0.55).toFixed(1)}`, w: 'd',
+      })),
+      { dots: circle(C, C, 6), n: 6 },
+    ],
+  },
+  snowflake: { name: 'Snowflake', parts: snowflake() },
+  tree: {
+    name: 'Tree',
+    parts: [
+      { d: TREE, w: 'o' },
+      { d: 'M38 44L58 40M32 64L66 58M28 76L72 70', w: 'd' },
+      { dot: [46, 30] }, { dot: [56, 50] }, { dot: [42, 52] }, { dot: [60, 66] }, { dot: [38, 68] }, { dot: [50, 74] },
+      { d: 'M44 80L44 92L56 92L56 80', w: 'o' },
+    ],
+  },
+  bell: {
+    name: 'Bell',
+    parts: [
+      { d: BELL, w: 'o' },
+      { d: 'M36 38C37 28 42 22 50 22', w: 'd' },
+      { d: 'M28 62L72 62', w: 'd' },
+      { dots: 'M33 54L67 54', n: 7 },
+      { d: circle(50, 80, 6), w: 'o' },
+      { d: 'M50 14C46 8 38 6 36 10C34 14 42 15 50 14C58 15 66 14 64 10C62 6 54 8 50 14Z', w: 'd' },
+    ],
+  },
   moon: {
     name: 'Moon',
     parts: [
       { d: MOON, w: 'o' },
       { dots: 'M54 18C40 24 30 36 30 52C30 68 42 81 58 84', n: 11 },
-      { d: sparkle(72, 34, 13), w: 'd' },
-      { dot: [80, 60] }, { dot: [64, 18] },
+      { d: poly(starPoints(4, 9, 3).map(([x, y]) => [x + 22, y - 18])), w: 'd' },
+      { d: poly(starPoints(4, 6, 2).map(([x, y]) => [x + 30, y + 2])), w: 'd' },
     ],
   },
-  rosette: { name: 'Rosette', parts: rosette() },
-  vine: { name: 'Vine', parts: vine() },
+  flower: { name: 'Flower', parts: flower() },
+  holly: {
+    name: 'Holly',
+    parts: [
+      { d: HOLLY_L.outline, w: 'o' },
+      { d: HOLLY_L.vein, w: 'd' },
+      { d: HOLLY_R.outline, w: 'o' },
+      { d: HOLLY_R.vein, w: 'd' },
+      { d: circle(50, 64, 8), w: 'o' },
+      { d: circle(38, 74, 7), w: 'o' },
+      { d: circle(62, 74, 7), w: 'o' },
+      { dot: [50, 64] }, { dot: [38, 74] }, { dot: [62, 74] },
+    ],
+  },
 };
 
 export const STAMP_IDS = Object.keys(STAMPS);
@@ -203,8 +201,7 @@ export function stampGeometry(id) {
   for (const p of STAMPS[id].parts) {
     const s = p.scale || 1;
     const mx = p.mirror ? -1 : 1;
-    const [ox, oy] = p.o || [C, C];
-    const m = [s * mx, 0, 0, s, ox - ox * s * mx, oy - oy * s];
+    const m = [s * mx, 0, 0, s, C - C * s * mx, C - C * s];
     const apply = ([x, y]) => [m[0] * x + m[4], m[3] * y + m[5]];
     if (p.dot) out.push({ dot: apply(p.dot) });
     else if (p.dots) for (const q of dotsAlong(p.dots, p.n)) out.push({ dot: apply(q) });
@@ -243,7 +240,7 @@ export function stampLines(id) {
 // A little SVG of the stamp for the picker.
 export function stampIcon(id) {
   const parts = stampGeometry(id).map((g) => (g.dot
-    ? `<circle cx="${g.dot[0].toFixed(1)}" cy="${g.dot[1].toFixed(1)}" r="2.3"/>`
-    : `<path d="${g.d}" transform="matrix(${g.m.join(' ')})" style="stroke-width:${((g.w === 'o' ? 3.6 : 2.4) / Math.abs(g.m[0])).toFixed(2)}"/>`));
+    ? `<circle cx="${g.dot[0].toFixed(1)}" cy="${g.dot[1].toFixed(1)}" r="2.6"/>`
+    : `<path d="${g.d}" transform="matrix(${g.m.join(' ')})" style="stroke-width:${((g.w === 'o' ? 4.5 : 3) / Math.abs(g.m[0])).toFixed(2)}"/>`));
   return `<svg class="stamp-svg" viewBox="-4 -4 108 108" aria-hidden="true">${parts.join('')}</svg>`;
 }

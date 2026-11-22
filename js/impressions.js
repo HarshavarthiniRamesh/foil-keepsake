@@ -7,7 +7,7 @@
 import { stampLines } from './stamps.js';
 
 // groove radii (texels) for a stamp's outlines, details and dots
-const STAMP_R = { o: 4.8, d: 3.4, dot: 4.2 };
+const STAMP_R = { o: 6, d: 4.2, dot: 4.8 };
 
 function seeded(seed) {
   let a = seed >>> 0;
@@ -136,13 +136,14 @@ export class Impressions {
     const rot = (rnd() - 0.5) * 0.26;
     const cr = Math.cos(rot), sr = Math.sin(rot);
     const cx = item.x / 2, cy = item.y / 2;
-    // two slow waves of wobble, different for x and y
+    // a slow, gentle drift, different for x and y: a steady hand, so the
+    // lines stay smooth rather than wiggling
     const wave = () => {
-      const f1 = 0.05 + rnd() * 0.05, f2 = 0.17 + rnd() * 0.12, p1 = rnd() * 6.3, p2 = rnd() * 6.3;
-      return (t) => Math.sin(t * f1 + p1) * 0.9 + Math.sin(t * f2 + p2) * 0.35;
+      const f1 = 0.04 + rnd() * 0.03, f2 = 0.12 + rnd() * 0.06, p1 = rnd() * 6.3, p2 = rnd() * 6.3;
+      return (t) => Math.sin(t * f1 + p1) * 0.9 + Math.sin(t * f2 + p2) * 0.1;
     };
     const wx = wave(), wy = wave(), wp = wave();
-    const amp = 0.7; // box units: a steady hand, not a shaky one
+    const amp = 0.45; // box units
     const place = ([x, y], t) => {
       const u = x - 50 + wx(t + x * 0.3) * amp, v = y - 50 + wy(t + y * 0.3) * amp;
       return [cx + (u * cr - v * sr) * k, cy + (u * sr + v * cr) * k];
@@ -157,8 +158,8 @@ export class Impressions {
     let t = rnd() * 100;
     for (const line of stampLines(item.stamp)) {
       if (line.dot) {
-        const [x, y] = place([line.dot[0] + (rnd() - 0.5) * 1.6, line.dot[1] + (rnd() - 0.5) * 1.6], t);
-        const r = STAMP_R.dot * (0.8 + rnd() * 0.4);
+        const [x, y] = place([line.dot[0] + (rnd() - 0.5) * 0.6, line.dot[1] + (rnd() - 0.5) * 0.6], t);
+        const r = STAMP_R.dot * (0.92 + rnd() * 0.16);
         this.#press(r, (c) => { c.moveTo(x, y); c.lineTo(x + 0.01, y); }, depthAt([x, y]));
         this.#mark([[x, y]], r);
         t += 7;
@@ -170,7 +171,7 @@ export class Impressions {
       const run = 6;
       for (let i = 0; i < pts.length - 1; i += run) {
         const seg = pts.slice(i, Math.min(i + run + 1, pts.length));
-        const r = R * (0.82 + 0.3 * (0.5 + 0.5 * wp(t + i * 1.6)));
+        const r = R * (0.93 + 0.1 * (0.5 + 0.5 * wp(t + i * 1.6)));
         this.#press(r, (c) => {
           c.moveTo(seg[0][0], seg[0][1]);
           for (let j = 1; j < seg.length; j++) c.lineTo(seg[j][0], seg[j][1]);
