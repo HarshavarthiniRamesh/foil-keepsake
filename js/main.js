@@ -394,10 +394,11 @@ function toast(msg) {
 // the stamps, showing what's current with a little arrow, and each opens its
 // choices above the dock.
 let lastTip = state.tool;
-const pops = [$('#foil-pop'), $('#tip-pop')];
+const COMPACT = matchMedia('(max-width: 560px), (orientation: landscape) and (max-height: 520px)');
+const pops = [$('#foil-pop'), $('#tip-pop'), $('#share-pop')];
 function closePops() {
   for (const p of pops) p.hidden = true;
-  for (const b of $$('.pick')) b.setAttribute('aria-expanded', 'false');
+  for (const b of $$('.pick, #share')) b.setAttribute('aria-expanded', 'false');
 }
 function togglePop(pop, trigger) {
   const open = pop.hidden;
@@ -406,9 +407,10 @@ function togglePop(pop, trigger) {
   if (!open) return;
   pop.hidden = false;
   trigger.setAttribute('aria-expanded', 'true');
-  // above the button, kept inside the dock's left edge
+  // above the button, kept inside the dock's edges
   const c = trigger.offsetLeft + trigger.offsetWidth / 2;
-  pop.style.left = `${Math.max(c, pop.offsetWidth / 2 - 6)}px`;
+  const half = pop.offsetWidth / 2 - 6;
+  pop.style.left = `${Math.min(Math.max(c, half), pop.offsetParent.clientWidth - half)}px`;
 }
 $('#foil-pick').addEventListener('click', (e) => { e.stopPropagation(); togglePop($('#foil-pop'), e.currentTarget); });
 $('#tip-pick').addEventListener('click', (e) => { e.stopPropagation(); togglePop($('#tip-pop'), e.currentTarget); });
@@ -429,7 +431,7 @@ for (const b of $$('[data-stamp]')) {
 }
 document.addEventListener('pointerdown', (e) => {
   if (!tray.hidden && !tray.contains(e.target) && !$('#stamps').contains(e.target)) setTray(false);
-  if (pops.some((p) => !p.hidden) && !e.target.closest('.pop, .pick')) closePops();
+  if (pops.some((p) => !p.hidden) && !e.target.closest('.pop, .pick, #share')) closePops();
 });
 
 for (const b of $$('[data-tool]')) {
@@ -465,18 +467,17 @@ $('#sound').addEventListener('click', () => {
   syncUI();
 });
 
-for (const id of ['#save', '#save-view']) {
-  $(id).addEventListener('click', () => {
-    canvas.toBlob((blob) => {
-      if (!blob) return;
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'foil-keepsake.png';
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    }, 'image/png');
-  });
+function saveImage() {
+  canvas.toBlob((blob) => {
+    if (!blob) return;
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'foil-keepsake.png';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }, 'image/png');
 }
+for (const id of ['#save', '#save-view']) $(id).addEventListener('click', saveImage);
 
 // Shared links are kept short: the packed note is saved under a short id
 // (api/notes.js) and the link carries just that. If saving isn't possible
@@ -500,8 +501,19 @@ async function linkFor(data) {
   return url;
 }
 
-$('#share').addEventListener('click', async () => {
+// On a phone, Share opens a small menu (the save button lives there); the
+// link starts saving as the menu opens, so "Send link" is quick.
+$('#share').addEventListener('click', (e) => {
   if (!state.strokes.length) return;
+  if (!COMPACT.matches) { sendLink(); return; }
+  e.stopPropagation();
+  togglePop($('#share-pop'), e.currentTarget);
+  if (!$('#share-pop').hidden) encodeKeepsake(state).then(linkFor);
+});
+$('#send-link').addEventListener('click', () => { closePops(); sendLink(); });
+$('#save-img').addEventListener('click', () => { closePops(); saveImage(); });
+
+async function sendLink() {
   const data = await encodeKeepsake(state);
   const fresh = !shortLinks.has(data);
   const url = await linkFor(data);
@@ -526,7 +538,7 @@ $('#share').addEventListener('click', async () => {
   } catch {
     window.prompt('Copy this link:', url);
   }
-});
+}
 
 $('#replay').addEventListener('click', () => {
   crunch.unlock();
