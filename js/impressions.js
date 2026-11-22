@@ -7,7 +7,7 @@
 import { stampLines } from './stamps.js';
 
 // groove radii (texels) for a stamp's outlines, details and dots
-const STAMP_R = { o: 6, d: 4.2, dot: 4.8 };
+const STAMP_R = { o: 4.8, d: 3.4, dot: 4.2 };
 
 function seeded(seed) {
   let a = seed >>> 0;
@@ -142,7 +142,7 @@ export class Impressions {
       return (t) => Math.sin(t * f1 + p1) * 0.9 + Math.sin(t * f2 + p2) * 0.35;
     };
     const wx = wave(), wy = wave(), wp = wave();
-    const amp = 1.3; // box units
+    const amp = 0.7; // box units: a steady hand, not a shaky one
     const place = ([x, y], t) => {
       const u = x - 50 + wx(t + x * 0.3) * amp, v = y - 50 + wy(t + y * 0.3) * amp;
       return [cx + (u * cr - v * sr) * k, cy + (u * sr + v * cr) * k];
