@@ -450,17 +450,35 @@ body[data-mode="view"] .edit-only { display: none; }
   .pill { height: 38px; padding: 0 13px; border-radius: 12px; }
 }
 
-/* phones: a compact toolbar with only the current foil and tip showing;
-   tapping either again switches to the next one */
+/* the foil and tip choices that open above the dock on phones */
+.pop { grid-template-columns: none; grid-auto-flow: column; align-items: center; gap: 6px; padding: 8px 10px; }
+.pop .swatch { width: 30px; height: 30px; margin: 0 4px; }
+.pop .dbtn { width: 40px; height: 40px; }
+
+/* phones: a compact toolbar showing only the current foil and tip, each with
+   a small corner notch to say there's more; tapping one opens the choices.
+   Buttons give a little room rather than push the dock off the screen. */
 @media (max-width: 560px), (orientation: landscape) and (max-height: 520px) {
-  .swatch:not([aria-pressed="true"]), .tip:not(.current) { display: none; }
+  .dock > .swatch:not([aria-pressed="true"]), .dock > .tip:not(.current) { display: none; }
   .dock { gap: 2px; }
-  .dbtn, .swatch { flex: none; }
+  .dock > .dbtn { flex: 0 1 38px; min-width: 30px; }
+  .dock > .swatch, .dock > .pill, .dock > .sep { flex: none; }
+  .dock > .swatch, .dock > .tip { position: relative; }
+  .dock > .swatch::after, .dock > .tip::after {
+    content: '';
+    position: absolute;
+    right: 3px;
+    bottom: 3px;
+    border: 3.5px solid transparent;
+    border-right-color: rgba(17, 17, 20, 0.45);
+    border-bottom-color: rgba(17, 17, 20, 0.45);
+    border-radius: 0 0 1px 0;
+  }
+  .dock > .swatch::after { right: -7px; bottom: -3px; }
 }
 
 @media (max-width: 400px) {
   #sound { display: none; }
-  .dbtn { width: 38px; }
   .swatch { width: 26px; height: 26px; margin: 0 5px; }
   .sep { margin: 0 4px; }
   .pill { padding: 0 14px; }
@@ -470,7 +488,6 @@ body[data-mode="view"] .edit-only { display: none; }
 @media (max-width: 345px) {
   .desk { gap: 12px; }
   #save { display: none; }
-  .dbtn { width: 34px; }
   .swatch { width: 24px; height: 24px; }
   .pill { padding: 0 10px; font-size: 13px; }
   h1 { font-size: 32px; }
