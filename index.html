@@ -56,17 +56,7 @@
       <button class="dbtn tip" data-tool="bold" aria-label="Bold tip" title="Bold tip"><i style="--d:11px"></i></button>
       <button class="dbtn" id="stamps" aria-label="Stamps" aria-expanded="false" aria-pressed="false" title="Stamps"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 13V9.8A2.5 2.5 0 0 1 12 4.5a2.5 2.5 0 0 1 2.5 5.3V13M5 13h14v3.5H5zM7 19.5h10"/></svg></button>
       <div id="tray" class="tray" hidden></div>
-      <!-- on phones the dock shows only the current foil and tip; these hold the choices -->
-      <div id="foil-pop" class="tray pop" hidden>
-        <button class="swatch gold" data-foil="gold" aria-label="Gold foil" title="Gold foil"></button>
-        <button class="swatch silver" data-foil="silver" aria-label="Silver foil" title="Silver foil"></button>
-      </div>
-      <div id="tip-pop" class="tray pop" hidden>
-        <button class="dbtn tip" data-tool="fine" aria-label="Fine tip" title="Fine tip"><i style="--d:4px"></i></button>
-        <button class="dbtn tip" data-tool="medium" aria-label="Medium tip" title="Medium tip"><i style="--d:7px"></i></button>
-        <button class="dbtn tip" data-tool="bold" aria-label="Bold tip" title="Bold tip"><i style="--d:11px"></i></button>
-      </div>
-      <span class="sep" aria-hidden="true"></span>
+      <span class="sep row-break" aria-hidden="true"></span>
       <button class="dbtn" id="undo" aria-label="Undo" title="Undo">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
       </button>
@@ -79,7 +69,7 @@
       <button class="dbtn" id="save" aria-label="Save image" title="Save image">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14"/></svg>
       </button>
-      <span class="sep" aria-hidden="true"></span>
+      <span class="sep before-share" aria-hidden="true"></span>
       <button class="pill" id="share">Share</button>
     </nav>
 

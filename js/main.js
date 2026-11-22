@@ -357,11 +357,7 @@ function frame(now) {
 // -------------------------------------------------------------------- UI ---
 function syncUI() {
   for (const b of $$('[data-foil]')) b.setAttribute('aria-pressed', String(b.dataset.foil === state.foil));
-  if (!isStamp(state.tool)) lastTip = state.tool;
-  for (const b of $$('[data-tool]')) {
-    b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool));
-    b.classList.toggle('current', b.dataset.tool === lastTip);
-  }
+  for (const b of $$('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool));
   for (const b of $$('[data-stamp]')) b.setAttribute('aria-pressed', String(state.tool === `stamp:${b.dataset.stamp}`));
   $('#stamps').setAttribute('aria-pressed', String(isStamp(state.tool)));
   $('#stamps').innerHTML = isStamp(state.tool) ? stampIcon(state.tool.slice(6)) : STAMP_GLYPH;
@@ -388,35 +384,8 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
-// On a phone the toolbar is compact: it shows just the current foil and tip
-// (marked with a little corner notch), and tapping one opens the choices.
-const COMPACT = matchMedia('(max-width: 560px), (orientation: landscape) and (max-height: 520px)');
-let lastTip = state.tool;
-const pops = [$('#foil-pop'), $('#tip-pop')];
-function closePops() {
-  for (const p of pops) p.hidden = true;
-  for (const b of $$('.dock > [aria-expanded]')) if (b.id !== 'stamps') b.setAttribute('aria-expanded', 'false');
-}
-function togglePop(pop, trigger) {
-  const open = pop.hidden;
-  closePops();
-  setTray(false);
-  if (!open) return;
-  pop.hidden = false;
-  trigger.setAttribute('aria-expanded', 'true');
-  // above the button, kept inside the dock's left edge
-  const c = trigger.offsetLeft + trigger.offsetWidth / 2;
-  pop.style.left = `${Math.max(c, pop.offsetWidth / 2 - 6)}px`;
-}
-// the dock's own button opens the choices on a phone; a choice picks it
-const inDock = (b) => b.parentElement.classList.contains('dock');
 for (const b of $$('[data-foil]')) {
-  b.addEventListener('click', (e) => {
-    if (COMPACT.matches && inDock(b)) { e.stopPropagation(); togglePop($('#foil-pop'), b); return; }
-    state.foil = b.dataset.foil;
-    closePops();
-    syncUI();
-  });
+  b.addEventListener('click', () => { state.foil = b.dataset.foil; syncUI(); });
 }
 // ---------------------------------------------------------------- stamps ---
 const STAMP_GLYPH = $('#stamps').innerHTML;
@@ -426,23 +395,16 @@ function setTray(open) {
   tray.hidden = !open;
   $('#stamps').setAttribute('aria-expanded', String(open));
 }
-$('#stamps').addEventListener('click', (e) => { e.stopPropagation(); closePops(); setTray(tray.hidden); });
+$('#stamps').addEventListener('click', (e) => { e.stopPropagation(); setTray(tray.hidden); });
 for (const b of $$('[data-stamp]')) {
   b.addEventListener('click', () => { state.tool = `stamp:${b.dataset.stamp}`; setTray(false); syncUI(); });
 }
 document.addEventListener('pointerdown', (e) => {
   if (!tray.hidden && !tray.contains(e.target) && !$('#stamps').contains(e.target)) setTray(false);
-  if (pops.some((p) => !p.hidden) && !e.target.closest('.pop, .dock > [data-foil], .dock > [data-tool]')) closePops();
 });
 
 for (const b of $$('[data-tool]')) {
-  b.addEventListener('click', (e) => {
-    // with a stamp in hand, the first tap just goes back to the pen
-    if (COMPACT.matches && inDock(b) && !isStamp(state.tool)) { e.stopPropagation(); togglePop($('#tip-pop'), b); return; }
-    state.tool = b.dataset.tool;
-    closePops();
-    syncUI();
-  });
+  b.addEventListener('click', () => { state.tool = b.dataset.tool; syncUI(); });
 }
 
 $('#undo').addEventListener('click', () => {

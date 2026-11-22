@@ -450,32 +450,36 @@ body[data-mode="view"] .edit-only { display: none; }
   .pill { height: 38px; padding: 0 13px; border-radius: 12px; }
 }
 
-/* the foil and tip choices that open above the dock on phones */
-.pop { grid-template-columns: none; grid-auto-flow: column; align-items: center; gap: 6px; padding: 8px 10px; }
-.pop .swatch { width: 30px; height: 30px; margin: 0 4px; }
-.pop .dbtn { width: 40px; height: 40px; }
-
-/* phones: a compact toolbar showing only the current foil and tip, each with
-   a small corner notch to say there's more; tapping one opens the choices.
-   Buttons give a little room rather than push the dock off the screen. */
-@media (max-width: 560px), (orientation: landscape) and (max-height: 520px) {
-  .dock > .swatch:not([aria-pressed="true"]), .dock > .tip:not(.current) { display: none; }
-  .dock { gap: 2px; }
-  .dock > .dbtn { flex: 0 1 38px; min-width: 30px; }
-  .dock > .swatch, .dock > .pill, .dock > .sep { flex: none; }
-  .dock > .swatch, .dock > .tip { position: relative; }
-  .dock > .swatch::after, .dock > .tip::after {
-    content: '';
-    position: absolute;
-    right: 3px;
-    bottom: 3px;
-    border: 3.5px solid transparent;
-    border-right-color: rgba(17, 17, 20, 0.45);
-    border-bottom-color: rgba(17, 17, 20, 0.45);
-    border-radius: 0 0 1px 0;
+/* phones held upright: the toolbar is one card in two rows on the same six
+   columns, so everything lines up. On top, what you press with (gold,
+   silver, the three tips, stamps); a fine rule; then undo, clear, sound,
+   save, and Share across the last two. */
+@media (max-width: 560px) {
+  body[data-mode="edit"] .dock {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    justify-items: center;
+    align-items: center;
+    row-gap: 2px;
+    width: min(100%, 400px);
+    padding: 4px 6px;
   }
-  .dock > .swatch::after { right: -7px; bottom: -3px; }
-}
+  body[data-mode="edit"] .dock .dbtn, body[data-mode="edit"] .dock .pill { height: 36px; }
+  .dock .sep { display: none; }
+  .dock .row-break {
+    display: block;
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    width: auto;
+    height: 1px;
+    margin: 1px 8px;
+  }
+  .dock .swatch { margin: 0; }
+  .dock #sound, .dock #save { display: grid; }
+  .dock .pill { grid-column: span 2; justify-self: stretch; margin: 0 2px; }
+  /* the taller toolbar takes a little height from the foil on short phones */
+  body[data-mode="edit"] .sheet { width: max(170px, min(100%, 520px, calc((100svh - 375px) * 0.75))); }
+}}
 
 @media (max-width: 400px) {
   #sound { display: none; }
