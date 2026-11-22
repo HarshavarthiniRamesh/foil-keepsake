@@ -70,18 +70,27 @@ function requestTilt() {
   if (tiltRequested || !matchMedia('(hover: none)').matches) return;
   tiltRequested = true;
   let rest = null;
+  // Work from which way is up in the phone's own frame, not the raw angles:
+  // those flip about wildly when the phone is held upright (gimbal lock),
+  // which threw the light off. Tilt is measured from however it's being
+  // held, and that rest pose slowly follows the hand.
+  const up = (e) => {
+    const k = Math.PI / 180, b = e.beta * k, g = e.gamma * k;
+    return [-Math.cos(b) * Math.sin(g), Math.sin(b), Math.cos(b) * Math.cos(g)];
+  };
   const listen = () => window.addEventListener('deviceorientation', (e) => {
     if (e.beta == null || e.gamma == null) return;
-    // measure from however the phone was being held when it started
-    if (!rest) rest = { beta: e.beta, gamma: e.gamma };
-    rest.beta += (e.beta - rest.beta) * 0.004;
-    rest.gamma += (e.gamma - rest.gamma) * 0.004;
-    const k = Math.PI / 180;
-    const lim = 25 * k;
-    deviceTilt = {
-      x: Math.max(-lim, Math.min(lim, -(e.beta - rest.beta) * k)),
-      y: Math.max(-lim, Math.min(lim, (e.gamma - rest.gamma) * k)),
-    };
+    const u = up(e);
+    if (!rest) rest = u.slice();
+    for (let i = 0; i < 3; i++) rest[i] += (u[i] - rest[i]) * 0.004;
+    const m = Math.hypot(...rest);
+    for (let i = 0; i < 3; i++) rest[i] /= m;
+    // rotation from the rest pose to now, about the phone's own x and y axes
+    const cx = rest[1] * u[2] - rest[2] * u[1];
+    const cy = rest[2] * u[0] - rest[0] * u[2];
+    const lim = 25 * (Math.PI / 180);
+    const clamp = (v) => Math.max(-lim, Math.min(lim, Math.asin(Math.max(-1, Math.min(1, v)))));
+    deviceTilt = { x: clamp(cx), y: clamp(-cy) };
   });
   const DOE = window.DeviceOrientationEvent;
   if (DOE && typeof DOE.requestPermission === 'function') {
@@ -348,7 +357,11 @@ function frame(now) {
 // -------------------------------------------------------------------- UI ---
 function syncUI() {
   for (const b of $$('[data-foil]')) b.setAttribute('aria-pressed', String(b.dataset.foil === state.foil));
-  for (const b of $$('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool));
+  if (!isStamp(state.tool)) lastTip = state.tool;
+  for (const b of $$('[data-tool]')) {
+    b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool));
+    b.classList.toggle('current', b.dataset.tool === lastTip);
+  }
   for (const b of $$('[data-stamp]')) b.setAttribute('aria-pressed', String(state.tool === `stamp:${b.dataset.stamp}`));
   $('#stamps').setAttribute('aria-pressed', String(isStamp(state.tool)));
   $('#stamps').innerHTML = isStamp(state.tool) ? stampIcon(state.tool.slice(6)) : STAMP_GLYPH;
@@ -375,8 +388,18 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
+// On a phone the toolbar is compact: it shows just the current foil and tip,
+// and tapping one again switches to the next.
+const COMPACT = matchMedia('(max-width: 560px), (orientation: landscape) and (max-height: 520px)');
+const FOILS = ['gold', 'silver'];
+const TIPS = ['fine', 'medium', 'bold'];
+let lastTip = state.tool;
 for (const b of $$('[data-foil]')) {
-  b.addEventListener('click', () => { state.foil = b.dataset.foil; syncUI(); });
+  b.addEventListener('click', () => {
+    const f = b.dataset.foil;
+    state.foil = COMPACT.matches && f === state.foil ? FOILS[(FOILS.indexOf(f) + 1) % FOILS.length] : f;
+    syncUI();
+  });
 }
 // ---------------------------------------------------------------- stamps ---
 const STAMP_GLYPH = $('#stamps').innerHTML;
@@ -395,7 +418,11 @@ document.addEventListener('pointerdown', (e) => {
 });
 
 for (const b of $$('[data-tool]')) {
-  b.addEventListener('click', () => { state.tool = b.dataset.tool; syncUI(); });
+  b.addEventListener('click', () => {
+    const t = b.dataset.tool;
+    state.tool = COMPACT.matches && t === state.tool ? TIPS[(TIPS.indexOf(t) + 1) % TIPS.length] : t;
+    syncUI();
+  });
 }
 
 $('#undo').addEventListener('click', () => {

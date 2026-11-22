@@ -412,6 +412,10 @@ body[data-mode="view"] .edit-only { display: none; }
 .toast {
   position: fixed;
   left: 50%;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  text-align: center;
+  text-wrap: balance;
   bottom: max(24px, env(safe-area-inset-bottom));
   padding: 10px 16px;
   border-radius: 10px;
@@ -446,18 +450,28 @@ body[data-mode="view"] .edit-only { display: none; }
   .pill { height: 38px; padding: 0 13px; border-radius: 12px; }
 }
 
+/* phones: a compact toolbar with only the current foil and tip showing;
+   tapping either again switches to the next one */
+@media (max-width: 560px), (orientation: landscape) and (max-height: 520px) {
+  .swatch:not([aria-pressed="true"]), .tip:not(.current) { display: none; }
+  .dock { gap: 2px; }
+  .dbtn, .swatch { flex: none; }
+}
+
 @media (max-width: 400px) {
-  .dock .sep, #save, #sound { display: none; }
-  .dbtn { width: 32px; }
-  .swatch { width: 24px; height: 24px; }
-  .pill { padding: 0 12px; }
+  #sound { display: none; }
+  .dbtn { width: 38px; }
+  .swatch { width: 26px; height: 26px; margin: 0 5px; }
+  .sep { margin: 0 4px; }
+  .pill { padding: 0 14px; }
   .hint, .credit { font-size: 12px; }
 }
 
 @media (max-width: 345px) {
   .desk { gap: 12px; }
-  .dbtn { width: 29px; }
-  .swatch { width: 22px; height: 22px; }
+  #save { display: none; }
+  .dbtn { width: 34px; }
+  .swatch { width: 24px; height: 24px; }
   .pill { padding: 0 10px; font-size: 13px; }
   h1 { font-size: 32px; }
 }
@@ -485,7 +499,7 @@ body[data-mode="view"] .edit-only { display: none; }
   .intro { grid-column: 2; grid-row: 2; margin: 0; }
   h1 { font-size: 32px; }
   .lede { margin-top: 4px; font-size: 14px; }
-  .dock { grid-column: 2; grid-row: 3; justify-self: center; flex-wrap: wrap; justify-content: center; gap: 0; padding: 5px; border-radius: 18px; }
+  .dock { grid-column: 2; grid-row: 3; justify-self: center; flex-wrap: nowrap; justify-content: center; gap: 0; padding: 5px; border-radius: 18px; }
   .dbtn { width: 36px; height: 38px; border-radius: 12px; }
   .swatch { width: 26px; height: 26px; margin: 0 2px; }
   .sep { margin: 0 3px; }
@@ -495,8 +509,7 @@ body[data-mode="view"] .edit-only { display: none; }
 }
 
 @media (orientation: landscape) and (max-height: 520px) and (max-width: 720px) {
-  .dock .sep, #save { display: none; }
-  .dbtn { width: 34px; }
+  .dbtn { width: 36px; }
   .dock { flex-wrap: nowrap; }
 }
 
