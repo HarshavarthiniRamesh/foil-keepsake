@@ -451,8 +451,8 @@ body[data-mode="view"] .edit-only { display: none; }
 }
 
 /* the foil and tip choices that open above the dock on phones */
-.pop { grid-template-columns: none; grid-auto-flow: column; align-items: center; gap: 6px; padding: 8px 10px; }
-.pop .swatch { width: 30px; height: 30px; margin: 0 4px; }
+.pop { grid-template-columns: none; grid-auto-flow: column; align-items: center; gap: 2px; padding: 6px; border-radius: 18px; }
+.pop .swatch { width: 30px; height: 30px; margin: 5px; }
 .pop .dbtn { width: 40px; height: 40px; }
 
 .pick, .chev { display: none; }
@@ -480,12 +480,13 @@ body[data-mode="view"] .edit-only { display: none; }
    opens its choices above. The chip in use is outlined in ink. */
 @media (max-width: 560px), (orientation: landscape) and (max-height: 520px) {
   .dock > .swatch, .dock > .tip, .dock > #save { display: none; }
-  /* the dock takes the full width and spreads its buttons out evenly; the
-     dividers become plain space, so the three groups sit a double step apart */
-  body[data-mode="edit"] .dock { width: min(100%, 440px); justify-content: space-between; gap: 0; padding: 5px 8px; }
+  /* the dock takes the full width and spreads its buttons out evenly. Its
+     padding equals the gap from its 18px corners to the buttons' 12px ones,
+     so the curves sit concentric. */
+  body[data-mode="edit"] .dock { width: min(100%, 440px); justify-content: space-between; gap: 0; padding: 6px; border-radius: 18px; }
   .dock > .dbtn { flex: 0 1 34px; width: 34px; min-width: 28px; }
   .dock > .pill { flex: none; padding: 0 13px; }
-  .dock > .sep { flex: none; width: 0; margin: 0; background: none; }
+  .dock > .sep { display: none; }
   .dock > .pick, .dock > #stamps {
     display: flex;
     flex: none;

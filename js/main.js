@@ -407,8 +407,11 @@ function togglePop(pop, trigger) {
   if (!open) return;
   pop.hidden = false;
   trigger.setAttribute('aria-expanded', 'true');
-  // above the button, kept inside the dock's edges
-  const c = trigger.offsetLeft + trigger.offsetWidth / 2;
+  // above the button, kept inside the dock's edges; the Share menu lines
+  // up with the button's right edge
+  const c = pop.id === 'share-pop'
+    ? trigger.offsetLeft + trigger.offsetWidth - pop.offsetWidth / 2
+    : trigger.offsetLeft + trigger.offsetWidth / 2;
   const half = pop.offsetWidth / 2 - 6;
   pop.style.left = `${Math.min(Math.max(c, half), pop.offsetParent.clientWidth - half)}px`;
 }
