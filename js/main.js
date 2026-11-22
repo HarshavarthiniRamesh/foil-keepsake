@@ -2,6 +2,9 @@ import { FoilRenderer, TEX_W, TEX_H } from './foil.js';
 import { Impressions } from './impressions.js';
 import { Crunch } from './crunch.js';
 import { encodeKeepsake, decodeKeepsake } from './share.js';
+import { STAMP_IDS, STAMPS, stampIcon } from './stamps.js';
+
+const STAMP_SIZE = Math.round(TEX_W * 0.26); // texels across
 
 const LOOKS = {
   gold: { albedo: [1.0, 0.64, 0.2], rough: 0.3, exposure: 1.05, depth: [3.6, 16, 85], flat: 0.36 },
@@ -36,53 +39,97 @@ function newSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
-// ---------------------------------------------------------------- light ----
-// The light is a lamp you place yourself: drag the little sun anywhere on or
-// around the sheet. Its position is in sheet fractions (0..1 across, 0..1 down).
-// The lamp can sit anywhere on the sheet or just past its edges.
-const LAMP_RANGE = [-0.12, 1.12];
+// ----------------------------------------------------------------- tilt ----
+// The light stays put; you tilt the foil to catch it, like holding a real
+// wrapper. With a mouse the sheet tips toward wherever you hover (and lies flat
+// while you press into it). On phones, tilting the phone does the same.
+const light = { x: 0.3, y: -0.05, z: 0.9 };
+const sheet = $('.sheet');
+const TILT_MAX = 3.5 * (Math.PI / 180); // radians, how far the sheet visibly tips
+const TILT_SHADE = 2.8; // the reflections swing a little more than the sheet
+const PERSPECTIVE = 1100; // px
+const tilt = { x: 0, y: 0, tx: 0, ty: 0 }; // x: rotateX, y: rotateY (CSS sense)
+let hovering = false;
+let deviceTilt = null;
 
-function clampLamp(x, y) {
-  const lim = (v) => Math.min(Math.max(v, LAMP_RANGE[0]), LAMP_RANGE[1]);
-  return [lim(x), lim(y)];
-}
-
-const light = { x: 0.18, y: 0.06, z: 0.9, tx: 0.18, ty: 0.06 };
-const lamp = $('#lamp');
-let lampDrag = null;
-
-function placeLamp() {
-  lamp.style.left = `${light.tx * 100}%`;
-  lamp.style.top = `${light.ty * 100}%`;
-}
-
-function moveLamp(e) {
-  const r = canvas.getBoundingClientRect();
-  [light.tx, light.ty] = clampLamp((e.clientX - lampDrag.dx - r.left) / r.width, (e.clientY - lampDrag.dy - r.top) / r.height);
-  placeLamp();
-}
-
-lamp.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  lamp.setPointerCapture(e.pointerId);
-  const r = canvas.getBoundingClientRect();
-  // keep the grab offset so the sun doesn't jump under the finger
-  lampDrag = { dx: e.clientX - (r.left + light.tx * r.width), dy: e.clientY - (r.top + light.ty * r.height) };
-  lamp.classList.add('dragging');
+window.addEventListener('pointermove', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  const r = sheet.getBoundingClientRect();
+  const u = ((e.clientX - r.left) / r.width) * 2 - 1;
+  const v = ((e.clientY - r.top) / r.height) * 2 - 1;
+  hovering = Math.abs(u) <= 1.15 && Math.abs(v) <= 1.15;
+  const c = (k) => Math.max(-1, Math.min(1, k));
+  // the spot under the cursor dips away, like pressing a fingertip there
+  tilt.ty = hovering ? c(u) * TILT_MAX : 0;
+  tilt.tx = hovering ? -c(v) * TILT_MAX : 0;
 });
-lamp.addEventListener('pointermove', (e) => { if (lampDrag) moveLamp(e); });
-const dropLamp = () => { lampDrag = null; lamp.classList.remove('dragging'); };
-lamp.addEventListener('pointerup', dropLamp);
-lamp.addEventListener('pointercancel', dropLamp);
-lamp.addEventListener('keydown', (e) => {
-  const step = e.shiftKey ? 0.1 : 0.03;
-  const d = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
-  if (!d) return;
-  e.preventDefault();
-  [light.tx, light.ty] = clampLamp(light.tx + d[0], light.ty + d[1]);
-  placeLamp();
-});
-placeLamp();
+document.documentElement.addEventListener('mouseleave', () => { hovering = false; tilt.tx = tilt.ty = 0; });
+
+let tiltRequested = false;
+function requestTilt() {
+  if (tiltRequested || !matchMedia('(hover: none)').matches) return;
+  tiltRequested = true;
+  let rest = null;
+  const listen = () => window.addEventListener('deviceorientation', (e) => {
+    if (e.beta == null || e.gamma == null) return;
+    // measure from however the phone was being held when it started
+    if (!rest) rest = { beta: e.beta, gamma: e.gamma };
+    rest.beta += (e.beta - rest.beta) * 0.004;
+    rest.gamma += (e.gamma - rest.gamma) * 0.004;
+    const k = Math.PI / 180;
+    const lim = 25 * k;
+    deviceTilt = {
+      x: Math.max(-lim, Math.min(lim, -(e.beta - rest.beta) * k)),
+      y: Math.max(-lim, Math.min(lim, (e.gamma - rest.gamma) * k)),
+    };
+  });
+  const DOE = window.DeviceOrientationEvent;
+  if (DOE && typeof DOE.requestPermission === 'function') {
+    DOE.requestPermission().then((s) => s === 'granted' && listen()).catch(() => {});
+  } else if (DOE) {
+    listen();
+  }
+}
+
+// Map a screen point onto the tilted sheet: cast a ray from the eye through
+// the point and intersect it with the sheet's plane, then undo the rotation.
+function rotate(a, b, [x, y, z]) {
+  // CSS rotateX(a) rotateY(b) applied to a point
+  const x1 = x * Math.cos(b) + z * Math.sin(b);
+  const z1 = -x * Math.sin(b) + z * Math.cos(b);
+  return [x1, y * Math.cos(a) - z1 * Math.sin(a), y * Math.sin(a) + z1 * Math.cos(a)];
+}
+function unrotate(a, b, [x, y, z]) {
+  const y1 = y * Math.cos(a) + z * Math.sin(a);
+  const z1 = -y * Math.sin(a) + z * Math.cos(a);
+  return [x * Math.cos(b) - z1 * Math.sin(b), y1, x * Math.sin(b) + z1 * Math.cos(b)];
+}
+function toSheet(e) {
+  const r = sheet.getBoundingClientRect();
+  const X = e.clientX - (r.left + r.width / 2), Y = e.clientY - (r.top + r.height / 2);
+  const n = rotate(tilt.x, tilt.y, [0, 0, 1]);
+  const p = PERSPECTIVE;
+  const t = -(n[2] * p) / (n[0] * X + n[1] * Y - n[2] * p);
+  const q = unrotate(tilt.x, tilt.y, [t * X, t * Y, p - t * p]);
+  return [q[0] / r.width + 0.5, q[1] / r.height + 0.5];
+}
+
+function updateTilt() {
+  // flat while pressing, while it replays, and while still folded up
+  const flat = current || replay || !revealed;
+  const tx = flat ? 0 : tilt.tx, ty = flat ? 0 : tilt.ty;
+  const ease = flat ? 0.25 : 0.1;
+  tilt.x += (tx - tilt.x) * ease;
+  tilt.y += (ty - tilt.y) * ease;
+  if (Math.abs(tilt.x) < 1e-4 && Math.abs(tilt.y) < 1e-4 && !tx && !ty) {
+    tilt.x = tilt.y = 0;
+    canvas.style.transform = '';
+  } else {
+    canvas.style.transform = `perspective(${PERSPECTIVE}px) rotateX(${tilt.x}rad) rotateY(${tilt.y}rad)`;
+  }
+  const d = deviceTilt || { x: 0, y: 0 };
+  return { x: tilt.x * TILT_SHADE + d.x, y: tilt.y * TILT_SHADE + d.y };
+}
 
 // --------------------------------------------------------------- drawing ---
 let current = null;
@@ -90,20 +137,58 @@ let lastMoveT = 0;
 let speedSm = 0;
 
 function toTex(e) {
-  const r = canvas.getBoundingClientRect();
-  const x = ((e.clientX - r.left) / r.width) * TEX_W;
-  const y = ((e.clientY - r.top) / r.height) * TEX_H;
+  const [u, v] = toSheet(e);
+  const x = u * TEX_W;
+  const y = v * TEX_H;
   return [
     Math.round(Math.min(Math.max(x, 0), TEX_W) * 2),
     Math.round(Math.min(Math.max(y, 0), TEX_H) * 2),
   ];
 }
 
+const isStamp = (tool) => tool.startsWith('stamp:');
+
+// a stamp lands with a firm press: a thump and a short crunch
+function stampSound() {
+  crunch.tap(1);
+  crunch.setSpeed(1.6);
+  setTimeout(() => crunch.tap(0.6), 45);
+  setTimeout(() => crunch.setSpeed(0), 130);
+}
+
+function placeStamp(e) {
+  const [x, y] = toTex(e);
+  const item = { stamp: state.tool.slice(6), x, y, s: STAMP_SIZE };
+  state.strokes.push(item);
+  ink.stamp(item);
+  stampSound();
+  syncUI();
+}
+
+// a faint outline of the chosen stamp follows the pointer
+const ghost = $('#ghost');
+function moveGhost(e) {
+  if (!isStamp(state.tool) || state.mode !== 'edit') { ghost.hidden = true; return; }
+  const r = sheet.getBoundingClientRect();
+  const u = (e.clientX - r.left) / r.width, v = (e.clientY - r.top) / r.height;
+  ghost.hidden = u < 0 || u > 1 || v < 0 || v > 1;
+  ghost.style.left = `${u * 100}%`;
+  ghost.style.top = `${v * 100}%`;
+}
+canvas.addEventListener('pointermove', moveGhost);
+canvas.addEventListener('pointerleave', () => { ghost.hidden = true; });
+
 canvas.addEventListener('pointerdown', (e) => {
   if (state.mode !== 'edit' || e.button > 0) return;
   e.preventDefault();
-  canvas.setPointerCapture(e.pointerId);
   crunch.unlock();
+  requestTilt();
+  if (isStamp(state.tool)) {
+    crunch.unlock().then(() => {});
+    placeStamp(e);
+    return;
+  }
+  canvas.setPointerCapture(e.pointerId);
   current = { tool: state.tool, pts: [toTex(e)] };
   state.strokes.push(current);
   ink.segment(current, 0);
@@ -155,19 +240,38 @@ function redrawAll() {
 // ---------------------------------------------------------------- replay ---
 let replay = null;
 
-function startReplay() {
+function startReplay(delay = 500) {
   ink.clear();
   let total = 0;
   for (const s of state.strokes) {
+    if (s.stamp) continue;
     for (let i = 1; i < s.pts.length; i++) {
       total += Math.hypot(s.pts[i][0] - s.pts[i - 1][0], s.pts[i][1] - s.pts[i - 1][1]);
     }
   }
-  const base = 0.75 * TEX_W * 2; // half-texels per second
+  // unhurried, like someone writing it out for you; long notes speed up a
+  // little so they still finish in under twenty seconds
+  const base = 0.5 * TEX_W * 2; // half-texels per second
   const now = performance.now();
-  replay = { si: 0, pi: 0, rate: Math.max(base, total / 10), last: now, pauseUntil: now + 500 };
+  replay = { si: 0, pi: 0, run: 0, stampT0: 0, rate: Math.max(base, total / 16), last: now, pauseUntil: now + delay };
   setBusy(true);
 }
+
+// how fast the hand moves into point i of a stroke: it starts slowly, and
+// eases off into sharp turns
+function handPace(s, i, run) {
+  let f = Math.min(1, 0.35 + run / (TEX_W * 0.12));
+  if (i >= 2) {
+    const [a, b, c] = [s.pts[i - 2], s.pts[i - 1], s.pts[i]];
+    const t1 = Math.atan2(b[1] - a[1], b[0] - a[0]), t2 = Math.atan2(c[1] - b[1], c[0] - b[0]);
+    let turn = Math.abs(t2 - t1);
+    if (turn > Math.PI) turn = 2 * Math.PI - turn;
+    f *= 1 - 0.55 * Math.min(turn / 1.2, 1);
+  }
+  return Math.max(f, 0.25);
+}
+
+const STAMP_MS = 850;
 
 function stepReplay(now) {
   const r = replay;
@@ -179,26 +283,44 @@ function stepReplay(now) {
   let moved = 0;
   while (budget > 0 && r.si < state.strokes.length) {
     const s = state.strokes[r.si];
+    if (s.stamp) {
+      // lowered, pressed in (rocking down from one side), then held a moment
+      if (!r.stampT0) r.stampT0 = now;
+      const k = Math.min((now - r.stampT0) / STAMP_MS, 1);
+      const press = k < 0.2 ? 0 : 1 - Math.pow(1 - (k - 0.2) / 0.8, 2.2);
+      if (press > 0 && !r.stampSounded) { stampSound(); r.stampSounded = true; }
+      ink.stamp(s, press);
+      if (k >= 1) {
+        r.si++;
+        r.stampT0 = 0;
+        r.stampSounded = false;
+        r.pauseUntil = now + 380 + Math.random() * 220;
+      }
+      break;
+    }
     if (r.pi === 0) {
       ink.segment(s, 0);
       r.pi = 1;
+      r.run = 0;
       crunch.tap(0.3);
     }
     if (r.pi >= s.pts.length) {
       ink.finish(s);
       r.si++;
       r.pi = 0;
-      r.pauseUntil = now + 160 + Math.random() * 180;
+      // lifting the pen and finding the next spot
+      r.pauseUntil = now + 200 + Math.random() * 250;
       break;
     }
     const a = s.pts[r.pi - 1], b = s.pts[r.pi];
     const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    budget -= d;
+    budget -= d / handPace(s, r.pi, r.run);
     moved += d;
+    r.run += d;
     ink.segment(s, r.pi);
     r.pi++;
   }
-  crunch.setSpeed(moved > 0 ? r.rate / (2 * TEX_W) : 0);
+  crunch.setSpeed(moved > 0 ? moved / dt / (2 * TEX_W) : 0);
 
   if (r.si >= state.strokes.length) {
     replay = null;
@@ -209,9 +331,7 @@ function stepReplay(now) {
 
 // ------------------------------------------------------------------ loop ---
 function frame(now) {
-  const ease = lampDrag ? 0.35 : 0.15;
-  light.x += (light.tx - light.x) * ease;
-  light.y += (light.ty - light.y) * ease;
+  const shadeTilt = updateTilt();
 
   if (current && now - lastMoveT > 60) {
     speedSm = 0;
@@ -221,7 +341,7 @@ function frame(now) {
 
   const dirty = ink.takeDirty();
   if (dirty) renderer.uploadStroke(ink.ctx, dirty);
-  renderer.render({ light, look: LOOKS[state.foil] });
+  renderer.render({ light, tilt: shadeTilt, look: LOOKS[state.foil] });
   requestAnimationFrame(frame);
 }
 
@@ -229,6 +349,11 @@ function frame(now) {
 function syncUI() {
   for (const b of $$('[data-foil]')) b.setAttribute('aria-pressed', String(b.dataset.foil === state.foil));
   for (const b of $$('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool));
+  for (const b of $$('[data-stamp]')) b.setAttribute('aria-pressed', String(state.tool === `stamp:${b.dataset.stamp}`));
+  $('#stamps').setAttribute('aria-pressed', String(isStamp(state.tool)));
+  $('#stamps').innerHTML = isStamp(state.tool) ? stampIcon(state.tool.slice(6)) : STAMP_GLYPH;
+  if (isStamp(state.tool)) ghost.innerHTML = stampIcon(state.tool.slice(6));
+  canvas.style.cursor = isStamp(state.tool) ? 'copy' : '';
   $('#undo').disabled = state.strokes.length === 0 && cleared.length === 0;
   $('#clear').disabled = state.strokes.length === 0;
   $('#share').disabled = state.strokes.length === 0;
@@ -253,6 +378,22 @@ function toast(msg) {
 for (const b of $$('[data-foil]')) {
   b.addEventListener('click', () => { state.foil = b.dataset.foil; syncUI(); });
 }
+// ---------------------------------------------------------------- stamps ---
+const STAMP_GLYPH = $('#stamps').innerHTML;
+const tray = $('#tray');
+tray.innerHTML = STAMP_IDS.map((id) => `<button class="stamp-opt" data-stamp="${id}" aria-label="${STAMPS[id].name} stamp" title="${STAMPS[id].name}">${stampIcon(id)}</button>`).join('');
+function setTray(open) {
+  tray.hidden = !open;
+  $('#stamps').setAttribute('aria-expanded', String(open));
+}
+$('#stamps').addEventListener('click', (e) => { e.stopPropagation(); setTray(tray.hidden); });
+for (const b of $$('[data-stamp]')) {
+  b.addEventListener('click', () => { state.tool = `stamp:${b.dataset.stamp}`; setTray(false); syncUI(); });
+}
+document.addEventListener('pointerdown', (e) => {
+  if (!tray.hidden && !tray.contains(e.target) && !$('#stamps').contains(e.target)) setTray(false);
+});
+
 for (const b of $$('[data-tool]')) {
   b.addEventListener('click', () => { state.tool = b.dataset.tool; syncUI(); });
 }
@@ -318,6 +459,7 @@ $('#share').addEventListener('click', async () => {
 
 $('#replay').addEventListener('click', () => {
   crunch.unlock();
+  requestTilt();
   startReplay();
 });
 
@@ -332,11 +474,122 @@ $('#own').addEventListener('click', () => {
   syncUI();
 });
 
-$('#reveal').addEventListener('click', () => {
-  $('#reveal').hidden = true;
+// ---------------------------------------------------------------- reveal ---
+// A shared keepsake arrives folded up into a little packet with a card beside
+// it. Tapping opens it out, then the pressing replays.
+// The folded flaps are pictures of the actual (blank) foil, so the hand-off to
+// the live sheet once it's open is seamless.
+let revealed = true;
+const reveal = $('#reveal');
+const fold = $('#fold');
+
+// Folded simply, in half and in half again: the bottom half up over the top,
+// then the right half over the left. The little packet sits centred and is
+// slid back into place as it opens. Each column holds its own two tiles so
+// the folds nest correctly.
+function buildFold(src) {
+  const COLS = [['l', 0], ['r', 0.5]];
+  const ROWS = [['t', 0], ['b', 0.5]];
+  fold.innerHTML = COLS.map(([c, cx]) => `<div class="col ${c}">${ROWS.map(([r, ry]) => {
+    const bg = `background-image:url(${src});background-size:200% 200%;background-position:${cx * 200}% ${ry * 200}%`;
+    // the back of the foil is the same patch seen from behind, trimmed in a
+    // little so the sheet's lit outer rim doesn't show along the packet's edge
+    const edge = (f) => (f ? 97.1 : 2.9);
+    const back = `background-image:url(${src});background-size:206% 206%;background-position:${edge(cx)}% ${edge(ry)}%`;
+    return `<div class="tile ${r}">`
+      + `<div class="face front" style="${bg}"><i class="shade"></i></div>`
+      + `<div class="face back" style="${back}"><i class="shade"></i></div>`
+      + '</div>';
+  }).join('')}</div>`).join('');
+}
+
+function showFolded() {
+  revealed = false;
+  $('#replay').disabled = $('#save-view').disabled = true;
+  canvas.classList.add('hidden-sheet');
+  // wait for the foil to be baked and drawn once, then photograph it
+  const snap = () => {
+    if (!renderer.ready) return requestAnimationFrame(snap);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      buildFold(canvas.toDataURL('image/png'));
+      reveal.hidden = false;
+    }));
+  };
+  snap();
+}
+
+// How a flap catches the light as it turns about its fold: the face toward
+// you, lit from the upper left, with the foil's sharp glint. Returns an
+// overlay colour relative to lying flat.
+const LIGHT = (() => { const l = [-0.35, -0.55, 0.76], m = Math.hypot(...l); return l.map((v) => v / m); })();
+const HALF = (() => { const h = [LIGHT[0], LIGHT[1], LIGHT[2] + 1], m = Math.hypot(...h); return h.map((v) => v / m); })();
+function flapLight(axis, deg) {
+  const a = (deg * Math.PI) / 180;
+  let n = axis === 'y' ? [Math.sin(a), 0, Math.cos(a)] : [0, -Math.sin(a), Math.cos(a)];
+  if (n[2] < 0) n = n.map((v) => -v); // the back face is the one showing
+  const dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const spec = (q) => Math.pow(Math.max(q, 0), 30);
+  const v = 0.9 * (dot(n, LIGHT) - LIGHT[2]) + 1.1 * (spec(dot(n, HALF)) - spec(HALF[2]));
+  const c = Math.max(-0.55, Math.min(0.26, v));
+  return c >= 0 ? `rgba(255, 236, 178, ${c.toFixed(3)})` : `rgba(28, 20, 6, ${(-c).toFixed(3)})`;
+}
+
+// Open one flap by hand: it's lifted gently off the packet, swung over, and
+// laid down, settling with the faintest lift as the foil relaxes.
+function openFlap(els, axis, from, ms) {
+  const N = 28;
+  const ease = (k) => k * k * k * (k * (k * 6 - 15) + 10);
+  const frames = [], shades = [];
+  for (let j = 0; j <= N; j++) {
+    const k = j / N;
+    let deg = k < 0.86 ? from * (1 - ease(k / 0.86)) : Math.sign(from) * 2.2 * Math.sin((Math.PI * (k - 0.86)) / 0.14);
+    if (j === N) deg = 0;
+    frames.push({ transform: `rotate${axis.toUpperCase()}(${deg.toFixed(2)}deg)` });
+    shades.push({ backgroundColor: flapLight(axis, deg) });
+  }
+  for (const el of els) {
+    el.animate(frames, { duration: ms, fill: 'forwards' });
+    for (const sh of el.querySelectorAll(':scope > .face > .shade')) sh.animate(shades, { duration: ms, fill: 'forwards' });
+  }
+}
+
+function unfold() {
+  const at = (ms, f) => setTimeout(f, ms);
+  const q = (sel) => [...fold.querySelectorAll(sel)];
+  const rest = (el) => parseFloat(getComputedStyle(el).getPropertyValue('--rest'));
+  reveal.classList.add('opening');
+  // the right half comes open first, then the bottom
+  const slide = (from, to, ms) => fold.animate([{ transform: `translate(${from})` }, { transform: `translate(${to})` }],
+    { duration: ms, easing: 'cubic-bezier(0.45, 0, 0.25, 1)', fill: 'forwards' });
+  const [r] = q('.col.r');
+  at(300, () => {
+    openFlap([r], 'y', rest(r), 1150);
+    r.animate([{ translate: '0 0 10px' }, { translate: '0 0 0' }], { duration: 1150, fill: 'forwards' });
+    slide('25%, 25%', '0%, 25%', 1150);
+  });
+  at(450, () => crunch.tap(0.35));
+  at(1550, () => { const b = q('.tile.b'); openFlap(b, 'x', rest(b[0]), 1150); slide('0%, 25%', '0%, 0%', 1150); });
+  at(1700, () => crunch.tap(0.3));
+  at(2850, () => {
+    canvas.classList.remove('hidden-sheet');
+    reveal.hidden = true;
+    reveal.classList.remove('opening');
+    revealed = true;
+    $('#save-view').disabled = false;
+    // a breath before the pressing starts to come through
+    startReplay(800);
+  });
+}
+
+// tap the card (or the packet itself) to open it
+function openNote() {
+  if (reveal.classList.contains('opening')) return;
   crunch.unlock();
-  startReplay();
-});
+  requestTilt();
+  unfold();
+}
+$('#open-note').addEventListener('click', openNote);
+fold.addEventListener('click', openNote);
 
 // ------------------------------------------------------------------ boot ---
 async function boot() {
@@ -345,13 +598,13 @@ async function boot() {
     try {
       const k = await decodeKeepsake(match[1], { w: TEX_W * 2, h: TEX_H * 2 });
       Object.assign(state, k, { mode: 'view' });
-      $('#reveal').hidden = false;
+      showFolded();
     } catch (err) {
       console.warn('Could not read keepsake from link:', err);
       toast('That link looks crumpled beyond repair. Here is a fresh wrapper.');
     }
   }
-  renderer.bake(state.seed);
+  renderer.bake(state.seed, { letterFold: state.mode === 'view' });
   syncUI();
   requestAnimationFrame(frame);
 }

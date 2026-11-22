@@ -1,7 +1,11 @@
 // Keepsakes travel entirely in the URL hash: foil colour, crinkle seed and
 // every stroke, varint/delta packed and deflated. Nothing is stored on a server.
 
-const VERSION = 1;
+import { STAMP_IDS } from './stamps.js';
+
+// v2 adds preset stamps: a tool byte of STAMP_BASE + i, then x, y, size.
+const VERSION = 2;
+const STAMP_BASE = 16;
 const FOILS = ['gold', 'silver'];
 const TOOL_IDS = ['fine', 'medium', 'bold'];
 const MAX_STROKES = 4000;
@@ -65,6 +69,13 @@ export async function encodeKeepsake({ foil, seed, strokes }) {
   pushVar(b, seed);
   pushVar(b, strokes.length);
   for (const s of strokes) {
+    if (s.stamp) {
+      b.push(STAMP_BASE + Math.max(0, STAMP_IDS.indexOf(s.stamp)));
+      pushVar(b, s.x);
+      pushVar(b, s.y);
+      pushVar(b, Math.round(s.s));
+      continue;
+    }
     b.push(Math.max(0, TOOL_IDS.indexOf(s.tool)));
     pushVar(b, s.pts.length);
     let px = 0, py = 0;
@@ -93,7 +104,8 @@ export async function decodeKeepsake(str, bounds) {
   else if (tag !== 'r') throw new Error('unknown format');
 
   const r = reader(bytes);
-  if (r.byte() !== VERSION) throw new Error('unsupported version');
+  const version = r.byte();
+  if (version < 1 || version > VERSION) throw new Error('unsupported version');
   const foil = FOILS[r.byte()] || 'gold';
   const seed = r.varint();
   const count = r.varint();
@@ -101,7 +113,15 @@ export async function decodeKeepsake(str, bounds) {
   const strokes = [];
   let total = 0;
   for (let s = 0; s < count; s++) {
-    const tool = TOOL_IDS[r.byte()] || 'medium';
+    const t = r.byte();
+    if (version >= 2 && t >= STAMP_BASE) {
+      const stamp = STAMP_IDS[t - STAMP_BASE] || STAMP_IDS[0];
+      const x = Math.min(r.varint(), bounds.w), y = Math.min(r.varint(), bounds.h);
+      const size = Math.min(Math.max(r.varint(), 20), 1200);
+      strokes.push({ stamp, x, y, s: size });
+      continue;
+    }
+    const tool = TOOL_IDS[t] || 'medium';
     const n = r.varint();
     total += n;
     if (n === 0 || total > MAX_POINTS) throw new Error('bad stroke');

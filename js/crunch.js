@@ -16,15 +16,20 @@ export class Crunch {
 
   unlock() {
     if (this.ready) {
-      if (this.ctx.state === 'suspended') this.ctx.resume();
+      if (this.ctx?.state === 'suspended') this.ctx.resume();
       return this.ready;
     }
+    // No AudioWorklet (e.g. a page opened over plain http on a phone): stay
+    // silent rather than get in the way of pressing.
     const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC || !window.AudioWorkletNode) {
+    let ctx = null;
+    try { ctx = AC && window.AudioWorkletNode ? new AC({ latencyHint: 'interactive' }) : null; } catch { ctx = null; }
+    if (!ctx?.audioWorklet) {
+      ctx?.close?.();
       this.ready = Promise.resolve();
       return this.ready;
     }
-    this.ctx = new AC({ latencyHint: 'interactive' });
+    this.ctx = ctx;
     this.ready = this.ctx.audioWorklet
       .addModule(new URL('./crunch-worklet.js', import.meta.url))
       .then(() => {

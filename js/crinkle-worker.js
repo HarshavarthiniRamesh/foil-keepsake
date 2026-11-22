@@ -20,7 +20,7 @@ function mulberry32(seed) {
   };
 }
 
-function generate(seed, W, H) {
+function generate(seed, W, H, letterFold) {
   const rnd = mulberry32(seed);
   const nx = new Float32Array(W * H);
   const ny = new Float32Array(W * H);
@@ -182,6 +182,20 @@ function generate(seed, W, H) {
   let acc = 0;
   for (let y = 0; y < H; y++) { acc = acc * 0.6 + (rnd() - 0.5); rows[y] = acc; }
 
+  // a shared one was folded in half and in half again to send. Each fold
+  // leaves a crease once opened out.
+  if (letterFold) {
+    const L = Math.hypot(W, H);
+    for (const [horizontal, at, amp] of [[true, 0.5, -0.14], [false, 0.5, 0.12]]) {
+      const ang = (horizontal ? 0 : Math.PI / 2) + (rnd() - 0.5) * 0.025;
+      const dx = Math.cos(ang), dy = Math.sin(ang);
+      const cx = horizontal ? W / 2 : W * (at + (rnd() - 0.5) * 0.012);
+      const cy = horizontal ? H * (at + (rnd() - 0.5) * 0.012) : H / 2;
+      piece(cx - dx * L / 2, cy - dy * L / 2, dx, dy, L, amp * 0.5, 2 + rnd() * 1.2, 1, 1, true);
+      piece(cx - dx * L / 2, cy - dy * L / 2, dx, dy, L, amp * 0.2, 24 + rnd() * 16, 1, 1, false);
+    }
+  }
+
   const out = new Uint8ClampedArray(W * H * 4);
   const bumpK = 0.05;
   for (let y = 0, i = 0; y < H; y++) {
@@ -204,7 +218,7 @@ function generate(seed, W, H) {
 }
 
 self.onmessage = (e) => {
-  const { id, seed, w, h } = e.data;
-  const data = generate(seed, w, h);
+  const { id, seed, w, h, letterFold } = e.data;
+  const data = generate(seed, w, h, letterFold);
   self.postMessage({ id, data }, [data.buffer]);
 };

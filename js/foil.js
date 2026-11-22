@@ -52,6 +52,7 @@ uniform sampler2D uBend;
 uniform vec2 uTexel;
 uniform vec2 uBendTexel;
 uniform vec3 uLight;
+uniform vec2 uTilt;   // how the sheet is tipped (rotateX, rotateY)
 uniform vec3 uAlbedo;
 uniform float uRough;
 uniform float uExposure;
@@ -119,6 +120,10 @@ void main() {
   n -= curl * 0.1;
 
   vec3 N = normalize(vec3(n, 1.0));
+  // tip the sheet: rotateX(uTilt.x) rotateY(uTilt.y), as in CSS (y points down)
+  float cb = cos(uTilt.y), sb = sin(uTilt.y), ca = cos(uTilt.x), sa = sin(uTilt.x);
+  N = vec3(N.x * cb + N.z * sb, N.y, -N.x * sb + N.z * cb);
+  N = vec3(N.x, N.y * ca - N.z * sa, N.y * sa + N.z * ca);
   vec3 P = vec3(st.x, st.y * A, 0.0);
   vec3 C = vec3(0.5, 0.5 * A, 2.4);
   vec3 V = normalize(C - P);
@@ -260,12 +265,13 @@ export class FoilRenderer {
     };
   }
 
-  // Crumple a new wrapper from a seed. Resolves once it's on the GPU.
-  bake(seed) {
+  // Crumple a new wrapper from a seed (with letter-fold creases if it was sent
+  // folded up). Resolves once it's on the GPU.
+  bake(seed, { letterFold = false } = {}) {
     const id = ++this.bakeId;
     return new Promise((resolve) => {
       this.pending.set(id, resolve);
-      this.worker.postMessage({ id, seed: seed >>> 0, w: TEX_W, h: TEX_H });
+      this.worker.postMessage({ id, seed: seed >>> 0, w: TEX_W, h: TEX_H, letterFold });
     });
   }
 
@@ -311,7 +317,7 @@ export class FoilRenderer {
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   }
 
-  render({ light, look }) {
+  render({ light, tilt = { x: 0, y: 0 }, look }) {
     const gl = this.gl;
     this.resize();
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -341,6 +347,7 @@ export class FoilRenderer {
     gl.uniform2f(u.uTexel, 1 / TEX_W, 1 / TEX_H);
     gl.uniform2f(u.uBendTexel, 1 / this.bendW, 1 / this.bendH);
     gl.uniform3f(u.uLight, light.x, light.y, light.z);
+    gl.uniform2f(u.uTilt, tilt.x, tilt.y);
     gl.uniform3fv(u.uAlbedo, look.albedo);
     gl.uniform1f(u.uRough, look.rough);
     gl.uniform1f(u.uExposure, look.exposure);
