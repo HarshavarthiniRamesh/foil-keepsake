@@ -463,18 +463,21 @@ body[data-mode="view"] .edit-only { display: none; }
    opens its choices above. The chip in use is outlined in ink. */
 @media (max-width: 560px), (orientation: landscape) and (max-height: 520px) {
   .dock > .swatch, .dock > .tip { display: none; }
-  .dock { gap: 2px; }
-  .dock > .dbtn { flex: 0 1 36px; min-width: 28px; }
-  .dock > .pill, .dock > .sep { flex: none; }
+  /* the dock takes the full width and spreads its buttons out evenly; the
+     dividers become plain space, so the three groups sit a double step apart */
+  body[data-mode="edit"] .dock { width: min(100%, 440px); justify-content: space-between; gap: 0; padding: 5px 8px; }
+  .dock > .dbtn { flex: 0 1 34px; width: 34px; min-width: 28px; }
+  .dock > .pill { flex: none; padding: 0 13px; }
+  .dock > .sep { flex: none; width: 0; margin: 0; background: none; }
   .dock > .pick, .dock > #stamps {
     display: flex;
     flex: none;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 1px;
     width: auto;
     min-width: 0;
-    padding: 0 5px 0 7px;
+    padding: 0 4px 0 6px;
     background: rgba(17, 17, 20, 0.045);
     box-shadow: inset 0 0 0 1px rgba(17, 17, 20, 0.07);
   }
@@ -497,7 +500,6 @@ body[data-mode="view"] .edit-only { display: none; }
   #stamps .glyph svg, #stamps .glyph .stamp-svg { width: 20px; height: 20px; }
 }
 @media (max-width: 400px) {
-  .dock > .sep { margin: 0 2px; }
   .dock > .pill { padding: 0 12px; }
 }
 
