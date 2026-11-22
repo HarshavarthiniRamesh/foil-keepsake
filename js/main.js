@@ -357,10 +357,16 @@ function frame(now) {
 // -------------------------------------------------------------------- UI ---
 function syncUI() {
   for (const b of $$('[data-foil]')) b.setAttribute('aria-pressed', String(b.dataset.foil === state.foil));
-  for (const b of $$('[data-tool]')) b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool));
+  if (!isStamp(state.tool)) lastTip = state.tool;
+  for (const b of $$('[data-tool]')) {
+    b.setAttribute('aria-pressed', String(b.dataset.tool === state.tool));
+  }
+  $('#foil-pick .cur').className = `cur swatch ${state.foil}`;
+  $('#tip-pick .cur i').style.setProperty('--d', $(`.tray [data-tool="${lastTip}"] i`).style.getPropertyValue('--d'));
+  $('#tip-pick').setAttribute('aria-pressed', String(!isStamp(state.tool)));
   for (const b of $$('[data-stamp]')) b.setAttribute('aria-pressed', String(state.tool === `stamp:${b.dataset.stamp}`));
   $('#stamps').setAttribute('aria-pressed', String(isStamp(state.tool)));
-  $('#stamps').innerHTML = isStamp(state.tool) ? stampIcon(state.tool.slice(6)) : STAMP_GLYPH;
+  $('#stamps .glyph').innerHTML = isStamp(state.tool) ? stampIcon(state.tool.slice(6)) : STAMP_GLYPH;
   if (isStamp(state.tool)) ghost.innerHTML = stampIcon(state.tool.slice(6));
   canvas.style.cursor = isStamp(state.tool) ? 'copy' : '';
   $('#undo').disabled = state.strokes.length === 0 && cleared.length === 0;
@@ -384,27 +390,54 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
 }
 
+// On a phone the toolbar is compact: one chip each for the foil, the tip and
+// the stamps, showing what's current with a little arrow, and each opens its
+// choices above the dock.
+let lastTip = state.tool;
+const pops = [$('#foil-pop'), $('#tip-pop')];
+function closePops() {
+  for (const p of pops) p.hidden = true;
+  for (const b of $$('.pick')) b.setAttribute('aria-expanded', 'false');
+}
+function togglePop(pop, trigger) {
+  const open = pop.hidden;
+  closePops();
+  setTray(false);
+  if (!open) return;
+  pop.hidden = false;
+  trigger.setAttribute('aria-expanded', 'true');
+  // above the button, kept inside the dock's left edge
+  const c = trigger.offsetLeft + trigger.offsetWidth / 2;
+  pop.style.left = `${Math.max(c, pop.offsetWidth / 2 - 6)}px`;
+}
+$('#foil-pick').addEventListener('click', (e) => { e.stopPropagation(); togglePop($('#foil-pop'), e.currentTarget); });
+$('#tip-pick').addEventListener('click', (e) => { e.stopPropagation(); togglePop($('#tip-pop'), e.currentTarget); });
 for (const b of $$('[data-foil]')) {
-  b.addEventListener('click', () => { state.foil = b.dataset.foil; syncUI(); });
+  b.addEventListener('click', () => { state.foil = b.dataset.foil; closePops(); syncUI(); });
 }
 // ---------------------------------------------------------------- stamps ---
-const STAMP_GLYPH = $('#stamps').innerHTML;
+const STAMP_GLYPH = $('#stamps .glyph').innerHTML;
 const tray = $('#tray');
 tray.innerHTML = STAMP_IDS.map((id) => `<button class="stamp-opt" data-stamp="${id}" aria-label="${STAMPS[id].name} stamp" title="${STAMPS[id].name}">${stampIcon(id)}</button>`).join('');
 function setTray(open) {
   tray.hidden = !open;
   $('#stamps').setAttribute('aria-expanded', String(open));
 }
-$('#stamps').addEventListener('click', (e) => { e.stopPropagation(); setTray(tray.hidden); });
+$('#stamps').addEventListener('click', (e) => { e.stopPropagation(); closePops(); setTray(tray.hidden); });
 for (const b of $$('[data-stamp]')) {
   b.addEventListener('click', () => { state.tool = `stamp:${b.dataset.stamp}`; setTray(false); syncUI(); });
 }
 document.addEventListener('pointerdown', (e) => {
   if (!tray.hidden && !tray.contains(e.target) && !$('#stamps').contains(e.target)) setTray(false);
+  if (pops.some((p) => !p.hidden) && !e.target.closest('.pop, .pick')) closePops();
 });
 
 for (const b of $$('[data-tool]')) {
-  b.addEventListener('click', () => { state.tool = b.dataset.tool; syncUI(); });
+  b.addEventListener('click', () => {
+    state.tool = b.dataset.tool;
+    closePops();
+    syncUI();
+  });
 }
 
 $('#undo').addEventListener('click', () => {

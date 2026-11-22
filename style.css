@@ -450,36 +450,56 @@ body[data-mode="view"] .edit-only { display: none; }
   .pill { height: 38px; padding: 0 13px; border-radius: 12px; }
 }
 
-/* phones held upright: the toolbar is one card in two rows on the same six
-   columns, so everything lines up. On top, what you press with (gold,
-   silver, the three tips, stamps); a fine rule; then undo, clear, sound,
-   save, and Share across the last two. */
-@media (max-width: 560px) {
-  body[data-mode="edit"] .dock {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    justify-items: center;
+/* the foil and tip choices that open above the dock on phones */
+.pop { grid-template-columns: none; grid-auto-flow: column; align-items: center; gap: 6px; padding: 8px 10px; }
+.pop .swatch { width: 30px; height: 30px; margin: 0 4px; }
+.pop .dbtn { width: 40px; height: 40px; }
+
+.pick, .chev { display: none; }
+#stamps .glyph { display: grid; place-items: center; }
+
+/* phones: a compact toolbar. The foil, the tip and the stamps are each a
+   small chip showing what's current with an arrow, like a select, and each
+   opens its choices above. The chip in use is outlined in ink. */
+@media (max-width: 560px), (orientation: landscape) and (max-height: 520px) {
+  .dock > .swatch, .dock > .tip { display: none; }
+  .dock { gap: 2px; }
+  .dock > .dbtn { flex: 0 1 36px; min-width: 28px; }
+  .dock > .pill, .dock > .sep { flex: none; }
+  .dock > .pick, .dock > #stamps {
+    display: flex;
+    flex: none;
     align-items: center;
-    row-gap: 2px;
-    width: min(100%, 400px);
-    padding: 4px 6px;
-  }
-  body[data-mode="edit"] .dock .dbtn, body[data-mode="edit"] .dock .pill { height: 36px; }
-  .dock .sep { display: none; }
-  .dock .row-break {
-    display: block;
-    grid-column: 1 / -1;
-    justify-self: stretch;
+    justify-content: center;
+    gap: 2px;
     width: auto;
-    height: 1px;
-    margin: 1px 8px;
+    min-width: 0;
+    padding: 0 5px 0 7px;
+    background: rgba(17, 17, 20, 0.045);
+    box-shadow: inset 0 0 0 1px rgba(17, 17, 20, 0.07);
   }
-  .dock .swatch { margin: 0; }
-  .dock #sound, .dock #save { display: grid; }
-  .dock .pill { grid-column: span 2; justify-self: stretch; margin: 0 2px; }
-  /* the taller toolbar takes a little height from the foil on short phones */
-  body[data-mode="edit"] .sheet { width: max(170px, min(100%, 520px, calc((100svh - 375px) * 0.75))); }
-}}
+  .dock > .dbtn.pick[aria-pressed="true"], .dock > #stamps[aria-pressed="true"] {
+    background: #fff;
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
+  .dock > [aria-expanded="true"] .chev { transform: rotate(180deg); }
+  .dock .chev {
+    display: block;
+    width: 9px;
+    height: 9px;
+    opacity: 0.55;
+    stroke-width: 1.5;
+    transition: transform 0.2s;
+  }
+  .pick .cur.swatch { display: block; width: 22px; height: 22px; margin: 0; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+  .pick .cur.tip { display: grid; place-items: center; width: 20px; height: 22px; }
+  .pick .cur.tip i { opacity: 1; }
+  #stamps .glyph svg, #stamps .glyph .stamp-svg { width: 20px; height: 20px; }
+}
+@media (max-width: 400px) {
+  .dock > .sep { margin: 0 2px; }
+  .dock > .pill { padding: 0 12px; }
+}
 
 @media (max-width: 400px) {
   #sound { display: none; }
